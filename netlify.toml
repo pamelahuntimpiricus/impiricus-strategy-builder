@@ -1,11 +1,2 @@
-toml[build]
+[build]
   functions = "netlify/functions"
-
-[functions]
-  timeout = 60
-
-[[headers]]
-  for = "/*"
-  [headers.values]
-    X-Frame-Options = "DENY"
-    X-Content-Type-Options = "nosniff"
