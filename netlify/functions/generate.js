@@ -19,22 +19,24 @@ exports.handler = async function (event) {
   }
 
   if (!process.env.ANTHROPIC_API_KEY) {
-    return { statusCode: 500, body: JSON.stringify({ error: "ANTHROPIC_API_KEY environment variable is not set" }) };
+    return { statusCode: 500, body: JSON.stringify({ error: "ANTHROPIC_API_KEY not set" }) };
   }
 
-  const systemPrompt = `You are an expert pharmaceutical HCP marketing strategist at Impiricus. Generate a 4-message HCP SMS strategy matrix. Return ONLY valid JSON, no markdown, no explanation, no code fences, in this exact structure: {"segments":["seg1"],"matrix":[{"messageNumber":1,"timing":"Early Campaign","cells":[{"segment":"seg1","topic":"chosen topic","headline":"8-12 word headline","strategy":"2-3 sentence rationale","keyData":"stat or empty string"}]}]}`;
+  const prompt = `You are a pharma HCP marketing strategist. Generate a 4-message SMS journey matrix.
 
-  const userPrompt = `Generate a 4-message HCP SMS strategy matrix.
 SEGMENTS: ${segments.join(", ")}
-SELECTED TOPICS: ${topics.join(", ")}
-STRATEGIC CONTEXT: ${context || "No additional context provided."}
-Rules: 4 message rows, one cell per segment per row, vary topics across journey, early=educate late=drive action, only use listed topics, return only valid JSON.`;
+TOPICS: ${topics.join(", ")}
+CONTEXT: ${(context || "").substring(0, 1000)}
+
+Return ONLY this JSON structure, no other text:
+{"segments":${JSON.stringify(segments)},"matrix":[{"messageNumber":1,"timing":"Early Campaign","cells":[{"segment":"SEGMENT_NAME","topic":"TOPIC","headline":"short headline","strategy":"one sentence rationale","keyData":""}]},{"messageNumber":2,"timing":"Mid Campaign","cells":[...]},{"messageNumber":3,"timing":"Late Campaign","cells":[...]},{"messageNumber":4,"timing":"Close Campaign","cells":[...]}]}
+
+Rules: one cell per segment per message, vary topics, early=educate late=action, only use listed topics, keep headline under 12 words, keep strategy to one sentence, return only valid JSON.`;
 
   const requestBody = JSON.stringify({
     model: "claude-sonnet-4-6",
-    max_tokens: 4000,
-    system: systemPrompt,
-    messages: [{ role: "user", content: userPrompt }],
+    max_tokens: 2000,
+    messages: [{ role: "user", content: prompt }],
   });
 
   return new Promise((resolve) => {
@@ -57,10 +59,7 @@ Rules: 4 message rows, one cell per segment per row, vary topics across journey,
         try {
           const parsed = JSON.parse(data);
           if (!parsed.content || !parsed.content[0]) {
-            resolve({
-              statusCode: 500,
-              body: JSON.stringify({ error: "No content in Claude response", raw: data.substring(0, 300) }),
-            });
+            resolve({ statusCode: 500, body: JSON.stringify({ error: "No response", raw: data.substring(0, 200) }) });
             return;
           }
           const text = parsed.content[0].text.replace(/```json|```/g, "").trim();
@@ -71,10 +70,7 @@ Rules: 4 message rows, one cell per segment per row, vary topics across journey,
             body: JSON.stringify(matrix),
           });
         } catch (e) {
-          resolve({
-            statusCode: 500,
-            body: JSON.stringify({ error: "Parse error: " + e.message, raw: data.substring(0, 300) }),
-          });
+          resolve({ statusCode: 500, body: JSON.stringify({ error: "Parse error: " + e.message, raw: data.substring(0, 200) }) });
         }
       });
     });
