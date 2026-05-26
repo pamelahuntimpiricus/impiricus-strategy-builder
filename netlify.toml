@@ -1,5 +1,8 @@
-[build]
+toml[build]
   functions = "netlify/functions"
+
+[functions]
+  timeout = 60
 
 [[headers]]
   for = "/*"
